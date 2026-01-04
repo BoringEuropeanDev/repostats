@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RepoStats</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <span class="logo-icon">📊</span>
+                <h1>RepoStats</h1>
+            </div>
+            <p class="tagline">Repository Health & Safety</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="state-loading">
+            <div class="spinner"></div>
+            <p>Analyzing repository...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="state-error hidden">
+            <p class="error-icon">⚠️</p>
+            <p class="error-message"></p>
+            <button id="retry-btn" class="btn btn-secondary">Retry</button>
+        </div>
+
+        <!-- Stats State -->
+        <div id="stats" class="state-stats hidden">
+            <!-- Health Score Gauge -->
+            <div class="health-gauge">
+                <div id="gauge-circle" class="gauge-circle grade-a">
+                    <div class="gauge-label" id="gauge-score">A</div>
+                    <div class="gauge-score">Health</div>
+                </div>
+                <div class="gauge-details">
+                    <div class="gauge-detail-row">
+                        <span class="gauge-detail-label">Maintenance</span>
+                        <span class="gauge-detail-value" id="maintenance-score">98%</span>
+                    </div>
+                    <div class="gauge-detail-row">
+                        <span class="gauge-detail-label">Activity</span>
+                        <span class="gauge-detail-value" id="activity-score">95%</span>
+                    </div>
+                    <div class="gauge-detail-row">
+                        <span class="gauge-detail-label">Community</span>
+                        <span class="gauge-detail-value" id="community-score">92%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-stars">0</div>
+                    <div class="metric-label">Stars</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-forks">0</div>
+                    <div class="metric-label">Forks</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-issues">0</div>
+                    <div class="metric-label">Open Issues</div>
+                </div>
+            </div>
+
+            <!-- Details Section -->
+            <div class="details-section">
+                <h3>Repository Details</h3>
+                <div class="detail-item">
+                    <span class="detail-label">Last Update</span>
+                    <span class="detail-value" id="last-update">2 days ago</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Primary Language</span>
+                    <span class="detail-value" id="language">JavaScript</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">License</span>
+                    <span class="detail-value" id="license">MIT</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Contributors</span>
+                    <span class="detail-value" id="contributors">0</span>
+                </div>
+            </div>
+
+            <!-- Risk Indicators -->
+            <div class="risk-section" id="risk-section">
+                <h3>⚠️ Risk Indicators</h3>
+                <div id="risk-list"></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="view-full-btn" class="btn btn-primary">View Full Report</button>
+                <button id="save-repo-btn" class="btn btn-secondary">Save to Vault</button>
+            </div>
+        </div>
+
+        <!-- No Repo State -->
+        <div id="no-repo" class="state-no-repo hidden">
+            <p class="icon">📦</p>
+            <p class="message">Not a GitHub repository page</p>
+            <p class="hint">Open this extension on any GitHub repo to see stats</p>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
