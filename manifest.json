@@ -1,0 +1,35 @@
+repostats_manifest.json
+{
+  "manifest_version": 3,
+  "name": "RepoStats",
+  "version": "1.0.0",
+  "description": "Real-time health scores and maintenance metrics for any GitHub repository. Know instantly if a repo is maintained, trusted, and safe.",
+  "permissions": [
+    "scripting",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://github.com/*",
+    "https://api.github.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "RepoStats - Repository Health & Safety"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "icons": {
+    "16": "images/icon-16.png",
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
+  }
+}
