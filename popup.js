@@ -1,20 +1,12 @@
 // ========== STATE ==========
 let githubToken = null;
-let userData = {
-  prs: [],
-  issues: [],
-  workflows: [],
-  trackedRepos: [],
-  commits: []
-};
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', async () => {
   await loadToken();
   setupTabs();
   setupEventListeners();
-  loadUserData();
-  updateDashboard();
+  fetchTrendingRepos('daily');
 });
 
 // ========== TAB SYSTEM ==========
@@ -66,7 +58,6 @@ async function saveToken() {
   }
 
   try {
-    // Verify token
     const response = await fetch('https://api.github.com/user', {
       headers: {
         'Authorization': `token ${token}`
@@ -81,10 +72,6 @@ async function saveToken() {
     githubToken = token;
     await chrome.storage.local.set({ githubToken });
     showStatus('✓ Token saved successfully!', 'success', 'tokenStatus');
-
-    // Load data with new token
-    await loadUserData();
-    updateDashboard();
   } catch (error) {
     showStatus('Error validating token', 'error', 'tokenStatus');
   }
@@ -100,16 +87,24 @@ function resetToken() {
 }
 
 // ========== GITHUB API CALLS ==========
-async function fetchGitHub(endpoint) {
-  if (!githubToken) return null;
-
+async function fetchGitHub(endpoint, headers = {}) {
   try {
+    const defaultHeaders = {
+      'Accept': 'application/vnd.github.v3+json'
+    };
+
+    if (githubToken) {
+      defaultHeaders['Authorization'] = `token ${githubToken}`;
+    }
+
     const response = await fetch(`https://api.github.com${endpoint}`, {
-      headers: {
-        'Authorization': `token ${githubToken}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
+      headers: { ...defaultHeaders, ...headers }
     });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+
     return response.json();
   } catch (error) {
     console.error('GitHub API error:', error);
@@ -117,98 +112,119 @@ async function fetchGitHub(endpoint) {
   }
 }
 
-// ========== LOAD USER DATA ==========
-async function loadUserData() {
-  if (!githubToken) return;
-
-  // Get user info
-  const user = await fetchGitHub('/user');
-  if (!user) return;
-
-  // Load PRs
-  userData.prs = await fetchGitHub('/search/issues?q=is:pr is:open involves:' + user.login + '&per_page=50');
-
-  // Load Issues
-  userData.issues = await fetchGitHub('/issues?state=open&per_page=50');
-
-  // Load workflows (requires repo context)
-  userData.workflows = [];
-
-  // Load commits
-  userData.commits = await fetchGitHub('/user/repos?sort=updated&per_page=10');
-
-  // Save to storage
-  await chrome.storage.local.set({ userData });
-}
-
-// ========== DASHBOARD ==========
-function updateDashboard() {
-  const prCount = userData.prs?.items?.length || 0;
-  const issueCount = userData.issues?.length || 0;
-  const repoCount = userData.trackedRepos?.length || 0;
-
-  document.getElementById('pr-count').textContent = prCount;
-  document.getElementById('issue-count').textContent = issueCount;
-  document.getElementById('repo-count').textContent = repoCount;
-  document.getElementById('workflow-count').textContent = '0';
-}
-
-// ========== PR TAB ==========
-async function filterPRs() {
-  const filter = document.getElementById('prFilter').value;
-  const list = document.getElementById('prsList');
-
-  if (!userData.prs?.items) {
-    list.innerHTML = '<div class="empty-state"><p>No PRs found. Add your GitHub token to get started.</p></div>';
+// ========== REPO STATS ==========
+async function fetchRepoStats() {
+  const repo = document.getElementById('repoInput').value.trim();
+  if (!repo) {
+    showStatus('Please enter a repository in the format: owner/repo', 'error', 'statsContainer');
     return;
   }
 
-  let filtered = userData.prs.items;
+  const container = document.getElementById('statsContainer');
+  container.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
 
-  if (filter === 'drafts') {
-    filtered = filtered.filter(pr => pr.draft);
-  } else if (filter === 'review') {
-    filtered = filtered.filter(pr => !pr.draft);
-  }
-
-  list.innerHTML = filtered.map(pr => `
-    <div class="bookmark-item">
-      <div class="bookmark-title">
-        <a href="#" data-repo-url="${pr.repository_url.split('/').slice(-2).join('/')}">${pr.title}</a>
-      </div>
-      <div class="bookmark-meta">${pr.repository_url.split('/').slice(-2).join('/')}</div>
-      <div class="bookmark-category">${pr.state}</div>
-    </div>
-  `).join('') || '<div class="empty-state"><p>No PRs match your filter.</p></div>';
-}
-
-// ========== ISSUES TAB ==========
-async function filterIssues() {
-  const filter = document.getElementById('issueFilter').value;
-  const list = document.getElementById('issuesList');
-
-  if (!userData.issues) {
-    list.innerHTML = '<div class="empty-state"><p>No issues found. Add your GitHub token to get started.</p></div>';
+  const data = await fetchGitHub(`/repos/${repo}`);
+  if (!data || data.message) {
+    container.innerHTML = '<div class="empty-state"><p>Repository not found. Check the name and try again.</p></div>';
     return;
   }
 
-  let filtered = userData.issues;
+  const languages = await fetchGitHub(`/repos/${repo}/languages`);
+  const topLanguage = languages ? Object.keys(languages).sort((a, b) => languages[b] - languages[a])[0] : 'Unknown';
 
-  if (filter === 'assigned') {
-    filtered = filtered.filter(issue => issue.assignee);
-  } else if (filter === 'mentioned') {
-    filtered = filtered.filter(issue => issue.state === 'open');
-  }
-
-  list.innerHTML = filtered.map(issue => `
+  container.innerHTML = `
     <div class="bookmark-item">
       <div class="bookmark-title">
-        <a href="#" data-repo-url="${issue.repository_url.split('/').slice(-2).join('/')}">${issue.title}</a>
+        <a href="#" data-repo-url="${data.full_name}">${data.name}</a>
       </div>
-      <div class="bookmark-meta">${issue.repository_url.split('/').slice(-2).join('/')}</div>
-      <div class="bookmark-category">${issue.state}</div>
+      <div class="bookmark-meta">${data.full_name}</div>
+      <div class="bookmark-category">${topLanguage}</div>
+      <div class="bookmark-notes">
+        ⭐ ${data.stargazers_count} | 🍴 ${data.forks_count} | 👁️ ${data.watchers_count}<br>
+        <br>
+        ${data.description || 'No description available'}<br>
+        <br>
+        <strong>Stats:</strong><br>
+        • Language: ${topLanguage}<br>
+        • Open Issues: ${data.open_issues_count}<br>
+        • Watchers: ${data.watchers_count}<br>
+        • License: ${data.license?.name || 'None'}<br>
+        • Last Updated: ${new Date(data.updated_at).toLocaleDateString()}
+      </div>
     </div>
-  `).join('') || '<div class="empty-state"><p>No issues match your filter.</p></div>';
+  `;
+}
+
+// ========== TRENDING REPOS ==========
+async function fetchTrendingRepos(period = 'daily') {
+  const container = document.getElementById('trendingList');
+  container.innerHTML = '<div class="empty-state"><p>Loading trending repositories...</p></div>';
+
+  const date = new Date();
+  date.setDate(date.getDate() - (period === 'daily' ? 1 : period === 'weekly' ? 7 : 30));
+  const dateStr = date.toISOString().split('T')[0];
+
+  const data = await fetchGitHub(`/search/repositories?q=created:>${dateStr}&sort=stars&order=desc&per_page=30`);
+
+  if (!data || !data.items) {
+    container.innerHTML = '<div class="empty-state"><p>Unable to fetch trending repositories.</p></div>';
+    return;
+  }
+
+  container.innerHTML = data.items.map(repo => `
+    <div class="bookmark-item">
+      <div class="bookmark-title">
+        <a href="#" data-repo-url="${repo.full_name}">${repo.name}</a>
+      </div>
+      <div class="bookmark-meta">${repo.full_name}</div>
+      <div class="bookmark-category">${repo.language || 'Unknown'}</div>
+      <div class="bookmark-notes">
+        ⭐ ${repo.stargazers_count} | 🍴 ${repo.forks_count}<br>
+        ${repo.description ? repo.description.substring(0, 100) + '...' : 'No description'}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ========== STARRED REPOS ==========
+async function fetchStarredRepos(sort = 'stars') {
+  if (!githubToken) {
+    document.getElementById('starredList').innerHTML = '<div class="empty-state"><p>Please add your GitHub token to see your starred repos.</p></div>';
+    return;
+  }
+
+  const container = document.getElementById('starredList');
+  container.innerHTML = '<div class="empty-state"><p>Loading your starred repositories...</p></div>';
+
+  const data = await fetchGitHub('/user/starred?per_page=50&sort=' + (sort === 'stars' ? 'desc' : sort));
+
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div class="empty-state"><p>No starred repositories yet.</p></div>';
+    return;
+  }
+
+  let repos = data;
+  if (sort === 'stars') {
+    repos = repos.sort((a, b) => b.stargazers_count - a.stargazers_count);
+  } else if (sort === 'updated') {
+    repos = repos.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+  } else if (sort === 'name') {
+    repos = repos.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  container.innerHTML = repos.map(repo => `
+    <div class="bookmark-item">
+      <div class="bookmark-title">
+        <a href="#" data-repo-url="${repo.full_name}">${repo.name}</a>
+      </div>
+      <div class="bookmark-meta">${repo.full_name}</div>
+      <div class="bookmark-category">${repo.language || 'Unknown'}</div>
+      <div class="bookmark-notes">
+        ⭐ ${repo.stargazers_count} | 🍴 ${repo.forks_count}<br>
+        ${repo.description ? repo.description.substring(0, 100) + '...' : 'No description'}
+      </div>
+    </div>
+  `).join('');
 }
 
 // ========== STATUS MESSAGES ==========
