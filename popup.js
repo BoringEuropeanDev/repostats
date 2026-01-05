@@ -1,124 +1,226 @@
-// RepoStats - Popup Script
-// Detects current tab and displays repository stats
+// ========== STATE ==========
+let githubToken = null;
+let userData = {
+  prs: [],
+  issues: [],
+  workflows: [],
+  trackedRepos: [],
+  commits: []
+};
 
+// ========== INIT ==========
 document.addEventListener('DOMContentLoaded', async () => {
-  // Get current tab
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  
-  // Check if we're on a GitHub repo
-  const isGitHubRepo = /github\.com\/[^/]+\/[^/]+/.test(tab.url);
-  
-  if (isGitHubRepo && tab.url !== 'chrome://newtab/') {
-    // Extract owner and repo from URL
-    const urlParts = tab.url.match(/github\.com\/([^/]+)\/([^/]+)/);
-    if (urlParts) {
-      const owner = urlParts[1];
-      const repo = urlParts[2];
-      
-      // Show loading
-      document.getElementById('loadingState').style.display = 'block';
-      
-      try {
-        // Fetch repo data from GitHub API
-        const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch repository');
-        }
-        
-        const data = await response.json();
-        
-        // Calculate health score
-        const stars = data.stargazers_count || 0;
-        const forks = data.forks_count || 0;
-        const openIssues = data.open_issues_count || 0;
-        const watchers = data.watchers_count || 0;
-        const lastUpdate = new Date(data.updated_at);
-        const daysSinceUpdate = Math.floor((Date.now() - lastUpdate) / (1000 * 60 * 60 * 24));
-        
-        // Calculate scores
-        const maintenanceScore = Math.max(0, Math.min(100, 100 - (daysSinceUpdate * 2)));
-        const activityScore = Math.min(100, (data.network_count || 0) * 5);
-        const communityScore = Math.min(100, Math.floor((stars / Math.max(1, forks + 1)) * 10));
-        
-        // Calculate overall grade
-        const avgScore = (maintenanceScore + activityScore + communityScore) / 3;
-        let grade = 'A';
-        if (avgScore < 90) grade = 'B';
-        if (avgScore < 80) grade = 'C';
-        if (avgScore < 70) grade = 'D';
-        if (avgScore < 60) grade = 'F';
-        
-        // Update UI
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('resultsState').style.display = 'block';
-        
-        document.getElementById('gradeDisplay').textContent = grade;
-        document.getElementById('maintenanceScore').textContent = Math.round(maintenanceScore);
-        document.getElementById('activityScore').textContent = Math.round(activityScore);
-        document.getElementById('communityScore').textContent = Math.round(communityScore);
-        
-        document.getElementById('starsCount').textContent = stars.toLocaleString();
-        document.getElementById('forksCount').textContent = forks.toLocaleString();
-        document.getElementById('issuesCount').textContent = openIssues;
-        
-        // Last update
-        const updateDate = lastUpdate.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
-        });
-        document.getElementById('lastUpdate').textContent = updateDate;
-        
-        // Language
-        document.getElementById('language').textContent = data.language || 'Not specified';
-        
-        // License
-        document.getElementById('license').textContent = data.license?.name || 'None';
-        
-        // Contributors
-        document.getElementById('contributors').textContent = data.network_count || 0;
-        
-        // Risk indicators
-        const risks = [];
-        if (daysSinceUpdate > 180) risks.push('⚠️ No updates in 6+ months');
-        if (openIssues > 100) risks.push(`⚠️ ${openIssues} open issues`);
-        if (data.archived) risks.push('⚠️ Repository is archived');
-        if (!data.license) risks.push('⚠️ No license specified');
-        
-        if (risks.length > 0) {
-          document.getElementById('riskIndicators').style.display = 'block';
-          document.getElementById('riskList').innerHTML = risks
-            .map(r => `<div style="margin-bottom: 4px;">• ${r}</div>`)
-            .join('');
-        }
-        
-      } catch (error) {
-        console.error('Error fetching repo:', error);
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('errorState').style.display = 'block';
-        
-        // Retry button
-        document.getElementById('retryBtn').addEventListener('click', () => {
-          location.reload();
-        });
-      }
-    } else {
-      showError();
-    }
-  } else {
-    showError();
-  }
+  await loadToken();
+  setupTabs();
+  setupEventListeners();
+  loadUserData();
+  updateDashboard();
 });
 
-function showError() {
-  document.getElementById('loadingState').style.display = 'none';
-  document.getElementById('resultsState').style.display = 'none';
-  document.getElementById('errorState').style.display = 'block';
-  
-  document.getElementById('retryBtn').addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.update(tabs[0].id, { url: tabs[0].url });
+// ========== TAB SYSTEM ==========
+function setupTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabName = btn.dataset.tab;
+      switchTab(tabName);
     });
   });
+}
+
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+  document.getElementById(tabName).classList.add('active');
+}
+
+// ========== EVENT LISTENERS ==========
+function setupEventListeners() {
+  // Repo link click handler
+  document.addEventListener('click', (e) => {
+    const repoLink = e.target.closest('[data-repo-url]');
+    if (repoLink) {
+      e.preventDefault();
+      const url = repoLink.getAttribute('data-repo-url');
+      const fullUrl = url.startsWith('http') ? url : `https://github.com/${url}`;
+      chrome.tabs.create({ url: fullUrl });
+    }
+  });
+}
+
+// ========== TOKEN MANAGEMENT ==========
+async function loadToken() {
+  const result = await chrome.storage.local.get('githubToken');
+  githubToken = result.githubToken || null;
+  const tokenInput = document.getElementById('githubToken');
+  if (tokenInput && githubToken) {
+    tokenInput.value = githubToken.substring(0, 10) + '...';
+  }
+}
+
+async function saveToken() {
+  const token = document.getElementById('githubToken').value.trim();
+  if (!token.startsWith('ghp_')) {
+    showStatus('Invalid token format. Must start with ghp_', 'error', 'tokenStatus');
+    return;
+  }
+
+  try {
+    // Verify token
+    const response = await fetch('https://api.github.com/user', {
+      headers: {
+        'Authorization': `token ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      showStatus('Invalid token. Please check and try again.', 'error', 'tokenStatus');
+      return;
+    }
+
+    githubToken = token;
+    await chrome.storage.local.set({ githubToken });
+    showStatus('✓ Token saved successfully!', 'success', 'tokenStatus');
+
+    // Load data with new token
+    await loadUserData();
+    updateDashboard();
+  } catch (error) {
+    showStatus('Error validating token', 'error', 'tokenStatus');
+  }
+}
+
+function resetToken() {
+  if (confirm('Clear GitHub token?')) {
+    githubToken = null;
+    chrome.storage.local.set({ githubToken: null });
+    document.getElementById('githubToken').value = '';
+    showStatus('Token cleared', 'success', 'tokenStatus');
+  }
+}
+
+// ========== GITHUB API CALLS ==========
+async function fetchGitHub(endpoint) {
+  if (!githubToken) return null;
+
+  try {
+    const response = await fetch(`https://api.github.com${endpoint}`, {
+      headers: {
+        'Authorization': `token ${githubToken}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    return response.json();
+  } catch (error) {
+    console.error('GitHub API error:', error);
+    return null;
+  }
+}
+
+// ========== LOAD USER DATA ==========
+async function loadUserData() {
+  if (!githubToken) return;
+
+  // Get user info
+  const user = await fetchGitHub('/user');
+  if (!user) return;
+
+  // Load PRs
+  userData.prs = await fetchGitHub('/search/issues?q=is:pr is:open involves:' + user.login + '&per_page=50');
+
+  // Load Issues
+  userData.issues = await fetchGitHub('/issues?state=open&per_page=50');
+
+  // Load workflows (requires repo context)
+  userData.workflows = [];
+
+  // Load commits
+  userData.commits = await fetchGitHub('/user/repos?sort=updated&per_page=10');
+
+  // Save to storage
+  await chrome.storage.local.set({ userData });
+}
+
+// ========== DASHBOARD ==========
+function updateDashboard() {
+  const prCount = userData.prs?.items?.length || 0;
+  const issueCount = userData.issues?.length || 0;
+  const repoCount = userData.trackedRepos?.length || 0;
+
+  document.getElementById('pr-count').textContent = prCount;
+  document.getElementById('issue-count').textContent = issueCount;
+  document.getElementById('repo-count').textContent = repoCount;
+  document.getElementById('workflow-count').textContent = '0';
+}
+
+// ========== PR TAB ==========
+async function filterPRs() {
+  const filter = document.getElementById('prFilter').value;
+  const list = document.getElementById('prsList');
+
+  if (!userData.prs?.items) {
+    list.innerHTML = '<div class="empty-state"><p>No PRs found. Add your GitHub token to get started.</p></div>';
+    return;
+  }
+
+  let filtered = userData.prs.items;
+
+  if (filter === 'drafts') {
+    filtered = filtered.filter(pr => pr.draft);
+  } else if (filter === 'review') {
+    filtered = filtered.filter(pr => !pr.draft);
+  }
+
+  list.innerHTML = filtered.map(pr => `
+    <div class="bookmark-item">
+      <div class="bookmark-title">
+        <a href="#" data-repo-url="${pr.repository_url.split('/').slice(-2).join('/')}">${pr.title}</a>
+      </div>
+      <div class="bookmark-meta">${pr.repository_url.split('/').slice(-2).join('/')}</div>
+      <div class="bookmark-category">${pr.state}</div>
+    </div>
+  `).join('') || '<div class="empty-state"><p>No PRs match your filter.</p></div>';
+}
+
+// ========== ISSUES TAB ==========
+async function filterIssues() {
+  const filter = document.getElementById('issueFilter').value;
+  const list = document.getElementById('issuesList');
+
+  if (!userData.issues) {
+    list.innerHTML = '<div class="empty-state"><p>No issues found. Add your GitHub token to get started.</p></div>';
+    return;
+  }
+
+  let filtered = userData.issues;
+
+  if (filter === 'assigned') {
+    filtered = filtered.filter(issue => issue.assignee);
+  } else if (filter === 'mentioned') {
+    filtered = filtered.filter(issue => issue.state === 'open');
+  }
+
+  list.innerHTML = filtered.map(issue => `
+    <div class="bookmark-item">
+      <div class="bookmark-title">
+        <a href="#" data-repo-url="${issue.repository_url.split('/').slice(-2).join('/')}">${issue.title}</a>
+      </div>
+      <div class="bookmark-meta">${issue.repository_url.split('/').slice(-2).join('/')}</div>
+      <div class="bookmark-category">${issue.state}</div>
+    </div>
+  `).join('') || '<div class="empty-state"><p>No issues match your filter.</p></div>';
+}
+
+// ========== STATUS MESSAGES ==========
+function showStatus(message, type, elementId) {
+  const statusEl = document.getElementById(elementId);
+  if (statusEl) {
+    statusEl.textContent = message;
+    statusEl.className = `status ${type}`;
+    if (type === 'success') {
+      setTimeout(() => {
+        statusEl.className = 'status';
+      }, 3000);
+    }
+  }
 }
