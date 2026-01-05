@@ -3,60 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RepoHub AIO - GitHub Power Tools</title>
+  <title>RepoStats - GitHub Repository Statistics</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <!-- Header -->
     <div class="header">
-      <h1>RepoHub AIO</h1>
-      <p>GitHub Power Tools</p>
+      <h1>RepoStats</h1>
+      <p>GitHub Repository Statistics</p>
     </div>
 
     <!-- Tabs -->
     <div class="tabs">
-      <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
-      <button class="tab-btn" data-tab="prs">🔄 PRs</button>
-      <button class="tab-btn" data-tab="issues">⚠️ Issues</button>
-      <button class="tab-btn" data-tab="workflows">⚡ Actions</button>
-      <button class="tab-btn" data-tab="repos">📦 Repos</button>
-      <button class="tab-btn" data-tab="health">❤️ Health</button>
-      <button class="tab-btn" data-tab="commits">📝 Commits</button>
-      <button class="tab-btn" data-tab="tools">🛠️ Tools</button>
+      <button class="tab-btn active" data-tab="setup">🔧 Setup</button>
+      <button class="tab-btn" data-tab="stats">📊 Stats</button>
+      <button class="tab-btn" data-tab="trending">🔥 Trending</button>
+      <button class="tab-btn" data-tab="starred">⭐ Starred</button>
     </div>
 
-    <!-- DASHBOARD TAB -->
-    <div id="dashboard" class="tab-content active">
-      <h3>Quick Stats</h3>
-      
-      <div class="stat-box">
-        <span id="pr-count">0</span>
-        <p>PRs Awaiting Review</p>
-        <button class="btn-small" onclick="switchTab('prs')">View</button>
-      </div>
-
-      <div class="stat-box">
-        <span id="issue-count">0</span>
-        <p>Open Issues</p>
-        <button class="btn-small" onclick="switchTab('issues')">View</button>
-      </div>
-
-      <div class="stat-box">
-        <span id="workflow-count">0</span>
-        <p>Workflow Runs</p>
-        <button class="btn-small" onclick="switchTab('workflows')">View</button>
-      </div>
-
-      <div class="stat-box">
-        <span id="repo-count">0</span>
-        <p>Tracked Repos</p>
-        <button class="btn-small" onclick="switchTab('repos')">View</button>
-      </div>
-    </div>
-
-    <!-- GITHUB TOKEN SETUP TAB -->
-    <div id="tools" class="tab-content">
+    <!-- SETUP TAB -->
+    <div id="setup" class="tab-content active">
       <h3>GitHub Token Setup</h3>
       <p>Add your GitHub PAT to unlock all features</p>
 
@@ -71,88 +38,48 @@
       <div id="tokenStatus" class="status"></div>
     </div>
 
-    <!-- PRS TAB -->
-    <div id="prs" class="tab-content">
-      <h3>Pull Requests</h3>
-      
-      <div class="filter-buttons">
-        <button class="filter-btn active" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">Awaiting Review</button>
-        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">My PRs</button>
-        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">Drafts</button>
-        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">Ready to Merge</button>
-      </div>
-
-      <div id="prsList" class="items-list">
-        <div class="empty-state"><p>No PRs found. Add your GitHub token to get started.</p></div>
-      </div>
-    </div>
-
-    <!-- ISSUES TAB -->
-    <div id="issues" class="tab-content">
-      <h3>Issue Inbox</h3>
-      
-      <div class="filter-buttons">
-        <button class="filter-btn active" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Open</button>
-        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Mentioned</button>
-        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Assigned to Me</button>
-        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Reported by Me</button>
-      </div>
-
-      <div id="issuesList" class="items-list">
-        <div class="empty-state"><p>No issues found. Add your GitHub token to get started.</p></div>
-      </div>
-    </div>
-
-    <!-- WORKFLOWS TAB -->
-    <div id="workflows" class="tab-content">
-      <h3>Workflow Runs</h3>
-      
-      <div class="filter-buttons">
-        <button class="filter-btn active">Latest</button>
-        <button class="filter-btn">Failed</button>
-        <button class="filter-btn">Successful</button>
-        <button class="filter-btn">In Progress</button>
-      </div>
-
-      <div class="items-list">
-        <div class="empty-state"><p>No workflows found. Add your GitHub token to get started.</p></div>
-      </div>
-    </div>
-
-    <!-- REPOS TAB -->
-    <div id="repos" class="tab-content">
-      <h3>Tracked Repositories</h3>
+    <!-- STATS TAB -->
+    <div id="stats" class="tab-content">
+      <h3>Repository Statistics</h3>
       
       <div class="form-group">
-        <label>Add Repository</label>
-        <input type="text" placeholder="username/repo" class="form-control">
-        <button class="btn btn-primary" style="margin-top: 8px;">Track Repo</button>
+        <label for="repoInput">Repository (owner/repo)</label>
+        <input type="text" id="repoInput" placeholder="torvalds/linux" class="form-control">
+        <button class="btn btn-primary" onclick="fetchRepoStats()" style="margin-top: 8px;">Fetch Stats</button>
       </div>
 
-      <h3>Your Repos</h3>
-      <div class="items-list">
-        <div class="empty-state"><p>No tracked repositories yet.</p></div>
-      </div>
-    </div>
-
-    <!-- HEALTH TAB -->
-    <div id="health" class="tab-content">
-      <h3>Code Health Insights</h3>
-      <div class="empty-state">
-        <p>View a repository to see code health metrics.</p>
+      <div id="statsContainer" class="items-list">
+        <div class="empty-state"><p>Enter a repository to view statistics.</p></div>
       </div>
     </div>
 
-    <!-- COMMITS TAB -->
-    <div id="commits" class="tab-content">
-      <h3>Recent Commits</h3>
+    <!-- TRENDING TAB -->
+    <div id="trending" class="tab-content">
+      <h3>Trending Repositories</h3>
       
-      <div class="form-group">
-        <input type="text" placeholder="Search Commits" class="form-control">
+      <div class="filter-buttons">
+        <button class="filter-btn active" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); fetchTrendingRepos('daily');">Daily</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); fetchTrendingRepos('weekly');">Weekly</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); fetchTrendingRepos('monthly');">Monthly</button>
       </div>
 
-      <div class="items-list">
-        <div class="empty-state"><p>No commits found. Add your GitHub token to get started.</p></div>
+      <div id="trendingList" class="items-list">
+        <div class="empty-state"><p>Loading trending repositories...</p></div>
+      </div>
+    </div>
+
+    <!-- STARRED TAB -->
+    <div id="starred" class="tab-content">
+      <h3>Your Starred Repositories</h3>
+      
+      <div class="filter-buttons">
+        <button class="filter-btn active" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); fetchStarredRepos('stars');">Most Stars</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); fetchStarredRepos('updated');">Recently Updated</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); fetchStarredRepos('name');">Name A-Z</button>
+      </div>
+
+      <div id="starredList" class="items-list">
+        <div class="empty-state"><p>No starred repositories. Add your GitHub token to see your starred repos.</p></div>
       </div>
     </div>
 
