@@ -3,108 +3,159 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RepoStats</title>
+  <title>RepoHub AIO - GitHub Power Tools</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <!-- Header -->
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-      <div style="font-size: 20px;">📊</div>
-      <div>
-        <h2 style="margin: 0; font-size: 16px; font-weight: 600;">RepoStats</h2>
-        <p style="margin: 0; font-size: 11px; color: #7dd3fc;">Repository Health & Safety</p>
+    <div class="header">
+      <h1>RepoHub AIO</h1>
+      <p>GitHub Power Tools</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="dashboard">📊 Dashboard</button>
+      <button class="tab-btn" data-tab="prs">🔄 PRs</button>
+      <button class="tab-btn" data-tab="issues">⚠️ Issues</button>
+      <button class="tab-btn" data-tab="workflows">⚡ Actions</button>
+      <button class="tab-btn" data-tab="repos">📦 Repos</button>
+      <button class="tab-btn" data-tab="health">❤️ Health</button>
+      <button class="tab-btn" data-tab="commits">📝 Commits</button>
+      <button class="tab-btn" data-tab="tools">🛠️ Tools</button>
+    </div>
+
+    <!-- DASHBOARD TAB -->
+    <div id="dashboard" class="tab-content active">
+      <h3>Quick Stats</h3>
+      
+      <div class="stat-box">
+        <span id="pr-count">0</span>
+        <p>PRs Awaiting Review</p>
+        <button class="btn-small" onclick="switchTab('prs')">View</button>
+      </div>
+
+      <div class="stat-box">
+        <span id="issue-count">0</span>
+        <p>Open Issues</p>
+        <button class="btn-small" onclick="switchTab('issues')">View</button>
+      </div>
+
+      <div class="stat-box">
+        <span id="workflow-count">0</span>
+        <p>Workflow Runs</p>
+        <button class="btn-small" onclick="switchTab('workflows')">View</button>
+      </div>
+
+      <div class="stat-box">
+        <span id="repo-count">0</span>
+        <p>Tracked Repos</p>
+        <button class="btn-small" onclick="switchTab('repos')">View</button>
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div id="loadingState" style="display: none;">
-      <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 20px 0;">Analyzing repository...</p>
+    <!-- GITHUB TOKEN SETUP TAB -->
+    <div id="tools" class="tab-content">
+      <h3>GitHub Token Setup</h3>
+      <p>Add your GitHub PAT to unlock all features</p>
+
+      <div class="form-group">
+        <label for="githubToken">GitHub Personal Access Token</label>
+        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxx" class="form-control">
+        <small style="color: var(--color-text-secondary);">Create at github.com/settings/tokens</small>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveToken()">Save Token</button>
+      <button class="btn btn-danger" onclick="resetToken()">Reset Token</button>
+      <div id="tokenStatus" class="status"></div>
     </div>
 
-    <!-- Error State -->
-    <div id="errorState" style="display: none;">
-      <div style="background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.2); border-radius: 4px; padding: 12px; margin-bottom: 12px;">
-        <p style="margin: 0; color: #ff6b6b; font-size: 12px;">⚠️ Repository not found or API limit reached</p>
+    <!-- PRS TAB -->
+    <div id="prs" class="tab-content">
+      <h3>Pull Requests</h3>
+      
+      <div class="filter-buttons">
+        <button class="filter-btn active" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">Awaiting Review</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">My PRs</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">Drafts</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterPRs();">Ready to Merge</button>
       </div>
-      <button id="retryBtn" class="btn btn-primary" style="width: 100%;">RETRY</button>
+
+      <div id="prsList" class="items-list">
+        <div class="empty-state"><p>No PRs found. Add your GitHub token to get started.</p></div>
+      </div>
     </div>
 
-    <!-- Results State -->
-    <div id="resultsState" style="display: none;">
-      <!-- Grade Display -->
-      <div style="background: rgba(125, 211, 252, 0.1); border: 1px solid rgba(125, 211, 252, 0.2); border-radius: 6px; padding: 16px; margin-bottom: 16px; text-align: center;">
-        <div style="font-size: 48px; font-weight: 700; color: #7dd3fc; line-height: 1;">
-          <span id="gradeDisplay">A</span>
-        </div>
-        <p style="margin: 8px 0 0 0; font-size: 11px; color: #94a3b8;">Health Score</p>
+    <!-- ISSUES TAB -->
+    <div id="issues" class="tab-content">
+      <h3>Issue Inbox</h3>
+      
+      <div class="filter-buttons">
+        <button class="filter-btn active" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Open</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Mentioned</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Assigned to Me</button>
+        <button class="filter-btn" onclick="document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); filterIssues();">Reported by Me</button>
       </div>
 
-      <!-- Metrics -->
-      <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.5px;">Maintenance</h3>
-        <p style="margin: 0; font-size: 13px; color: #e0e6ed;"><span id="maintenanceScore">98</span>%</p>
-      </div>
-
-      <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.5px;">Activity</h3>
-        <p style="margin: 0; font-size: 13px; color: #e0e6ed;"><span id="activityScore">95</span>%</p>
-      </div>
-
-      <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.5px;">Community</h3>
-        <p style="margin: 0; font-size: 13px; color: #e0e6ed;"><span id="communityScore">92</span>%</p>
-      </div>
-
-      <!-- Stars & Forks -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-        <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px;">
-          <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.5px;">Stars</h3>
-          <p style="margin: 0; font-size: 13px; color: #e0e6ed;"><span id="starsCount">0</span></p>
-        </div>
-        <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px;">
-          <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.5px;">Forks</h3>
-          <p style="margin: 0; font-size: 13px; color: #e0e6ed;"><span id="forksCount">0</span></p>
-        </div>
-      </div>
-
-      <!-- Open Issues -->
-      <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.5px;">Open Issues</h3>
-        <p style="margin: 0; font-size: 13px; color: #e0e6ed;"><span id="issuesCount">0</span></p>
-      </div>
-
-      <!-- Repository Details -->
-      <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
-        <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.5px;">Repository Details</h3>
-        <p style="margin: 6px 0; font-size: 12px; color: #94a3b8;">
-          <strong style="color: #e0e6ed;">Last Update:</strong> <span id="lastUpdate">2 days ago</span>
-        </p>
-        <p style="margin: 6px 0; font-size: 12px; color: #94a3b8;">
-          <strong style="color: #e0e6ed;">Language:</strong> <span id="language">JavaScript</span>
-        </p>
-        <p style="margin: 6px 0; font-size: 12px; color: #94a3b8;">
-          <strong style="color: #e0e6ed;">License:</strong> <span id="license">MIT</span>
-        </p>
-        <p style="margin: 6px 0; font-size: 12px; color: #94a3b8;">
-          <strong style="color: #e0e6ed;">Contributors:</strong> <span id="contributors">0</span>
-        </p>
-      </div>
-
-      <!-- Risk Indicators -->
-      <div id="riskIndicators" style="background: #0f172a; border: 1px solid #1e293b; border-radius: 4px; padding: 12px; margin-bottom: 12px; display: none;">
-        <h3 style="margin: 0 0 8px 0; font-size: 11px; color: #ff6b6b; text-transform: uppercase; letter-spacing: 0.5px;">⚠️ Risk Indicators</h3>
-        <div id="riskList" style="font-size: 12px; color: #94a3b8; line-height: 1.6;"></div>
-      </div>
-
-      <!-- Info Message -->
-      <div style="background: rgba(94, 200, 255, 0.1); border: 1px solid rgba(125, 211, 252, 0.2); border-radius: 4px; padding: 10px; text-align: center;">
-        <p style="margin: 0; font-size: 11px; color: #94a3b8;">
-          🔗 Not a GitHub repository page?<br>
-          Open this extension on any GitHub repo to see stats
-        </p>
+      <div id="issuesList" class="items-list">
+        <div class="empty-state"><p>No issues found. Add your GitHub token to get started.</p></div>
       </div>
     </div>
+
+    <!-- WORKFLOWS TAB -->
+    <div id="workflows" class="tab-content">
+      <h3>Workflow Runs</h3>
+      
+      <div class="filter-buttons">
+        <button class="filter-btn active">Latest</button>
+        <button class="filter-btn">Failed</button>
+        <button class="filter-btn">Successful</button>
+        <button class="filter-btn">In Progress</button>
+      </div>
+
+      <div class="items-list">
+        <div class="empty-state"><p>No workflows found. Add your GitHub token to get started.</p></div>
+      </div>
+    </div>
+
+    <!-- REPOS TAB -->
+    <div id="repos" class="tab-content">
+      <h3>Tracked Repositories</h3>
+      
+      <div class="form-group">
+        <label>Add Repository</label>
+        <input type="text" placeholder="username/repo" class="form-control">
+        <button class="btn btn-primary" style="margin-top: 8px;">Track Repo</button>
+      </div>
+
+      <h3>Your Repos</h3>
+      <div class="items-list">
+        <div class="empty-state"><p>No tracked repositories yet.</p></div>
+      </div>
+    </div>
+
+    <!-- HEALTH TAB -->
+    <div id="health" class="tab-content">
+      <h3>Code Health Insights</h3>
+      <div class="empty-state">
+        <p>View a repository to see code health metrics.</p>
+      </div>
+    </div>
+
+    <!-- COMMITS TAB -->
+    <div id="commits" class="tab-content">
+      <h3>Recent Commits</h3>
+      
+      <div class="form-group">
+        <input type="text" placeholder="Search Commits" class="form-control">
+      </div>
+
+      <div class="items-list">
+        <div class="empty-state"><p>No commits found. Add your GitHub token to get started.</p></div>
+      </div>
+    </div>
+
   </div>
 
   <script src="popup.js"></script>
